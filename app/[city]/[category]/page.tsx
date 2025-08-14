@@ -1,190 +1,160 @@
-"use client"
+// app/[city]/[category]/page.tsx
+import { notFound } from "next/navigation"
+import { getAvailableFilters } from "@/lib/filters"
+import { RestaurantFiltersSidebar } from "@/components/city/Filters"
+import HeaderClient from "@/components/category/ClientComponents/HeaderClient"
+import { RestaurantList } from "@/components/city/RestaurantList"
+import { createClient } from "@/lib/supabaseServer"
+import FaqAccordion from "@/components/city/ClientComponents/FaqAccordion"
+import type { Metadata } from "next"
 
-import { useState, useMemo, useEffect } from "react"
-import { MapPin, Filter } from "lucide-react"
-import type { Restaurant } from "@/types/restaurant"
-import { Breadcrumbs } from "@/components/ui/breadcrumbs"
-import { RestaurantCard } from "@/components/restaurant/restaurant-card"
-import { RestaurantFilters, type FilterState } from "@/components/restaurant/restaurant-filters"
-import { Button } from "@/components/ui/button"
-import {
-  getRestaurantsByCityAndCategory,
-  getCityBySlug,
-  getCategoryBySlug,
-  getAvailableAmenities,
-} from "@/lib/mock-restaurants"
+export const metadata: Metadata = { title: "Restaurantes por categoría" }
+export const dynamic = "force-dynamic"
 
-interface PageProps {
-  params: {
-    city: string
-    category: string
-  }
+type SP = { [key: string]: string | string[] | undefined }
+interface Props {
+  params: Promise<{ city: string; category: string }>
+  searchParams: Promise<SP>
 }
 
-export default function CategoryPage({ params }: PageProps) {
-  const [restaurants, setRestaurants] = useState<Restaurant[]>([])
-  const [city, setCity] = useState<any>(null)
-  const [category, setCategory] = useState<any>(null)
-  const [availableAmenities, setAvailableAmenities] = useState<string[]>([])
-  const [loading, setLoading] = useState(true)
-  const [filters, setFilters] = useState<FilterState>({
-    rating: [],
-    priceRange: [],
-    amenities: [],
-    openNow: false,
-  })
-  const [showFilters, setShowFilters] = useState(false)
-  const [favoriteRestaurants, setFavoriteRestaurants] = useState<Set<string>>(new Set())
+function toArray(v: string | string[] | undefined): string[] {
+  if (!v) return []
+  return Array.isArray(v) ? v : [v]
+}
 
-  useEffect(() => {
-    async function loadData() {
-      setLoading(true)
-      try {
-        const [restaurantsData, cityData, categoryData, amenitiesData] = await Promise.all([
-          getRestaurantsByCityAndCategory(params.city, params.category),
-          getCityBySlug(params.city),
-          getCategoryBySlug(params.category),
-          getAvailableAmenities(),
-        ])
+function toTitleCaseFromSlug(slug: string): string {
+  return slug
+    .split("-")
+    .map((w: string) => w.charAt(0).toUpperCase() + w.slice(1))
+    .join(" ")
+}
 
-        setRestaurants(restaurantsData)
-        setCity(cityData)
-        setCategory(categoryData)
-        setAvailableAmenities(amenitiesData)
-      } catch (error) {
-        console.error("Error loading data:", error)
-      } finally {
-        setLoading(false)
-      }
-    }
+export default async function CategoryPage({ params, searchParams }: Props) {
+  const { city, category } = await params
+  const sp = await searchParams
 
-    loadData()
-  }, [params.city, params.category])
+  const supabase = createClient()
+  const filters = await getAvailableFilters(city)
 
-  const filteredRestaurants = useMemo(() => {
-    return restaurants.filter((restaurant) => {
-      // Filtro por calificación
-      if (filters.rating.length > 0) {
-        const meetRating = filters.rating.some((rating) => restaurant.rating >= rating)
-        if (!meetRating) return false
-      }
+  // ---- City: slug exacto requerido
+  const { data: cities } = await supabase
+    .from("cities")
+    .select("id, name, description, slug")
+    .eq("slug", city)
+    .limit(1)
 
-      // Filtro por rango de precio
-      if (filters.priceRange.length > 0) {
-        if (!filters.priceRange.includes(restaurant.priceRange)) return false
-      }
+  const cityRow = cities?.[0]
+  if (!cityRow) notFound()
 
-      // Filtro por amenidades
-      if (filters.amenities.length > 0) {
-        const hasAmenities = filters.amenities.every((amenity) => restaurant.amenities.includes(amenity))
-        if (!hasAmenities) return false
-      }
+  const cityId = cityRow.id as string
+  const cityTitle = cityRow.name // 👈 usa el nombre con acento
+  const cityDescription: string | null = cityRow.description ?? null
 
-      // Filtro por abierto ahora
-      if (filters.openNow && !restaurant.isOpen) return false
+  // ---- Category: slug exacto requerido
+  const { data: cat } = await supabase
+    .from("categories")
+    .select("id, slug, name, description")
+    .eq("slug", category)
+    .limit(1)
 
-      return true
-    })
-  }, [restaurants, filters])
+  const categoryRow = cat?.[0]
+  if (!categoryRow) notFound()
 
-  const handleFavoriteToggle = (restaurantId: string) => {
-    setFavoriteRestaurants((prev) => {
-      const newFavorites = new Set(prev)
-      if (newFavorites.has(restaurantId)) {
-        newFavorites.delete(restaurantId)
-      } else {
-        newFavorites.add(restaurantId)
-      }
-      return newFavorites
-    })
+  const categoryId = categoryRow.id as string
+  const categoryTitle =
+    categoryRow.name ?? toTitleCaseFromSlug(categoryRow.slug)
+  const categoryDescription: string | null = categoryRow.description ?? null
+
+  // ---- Conteo de restaurantes (solo de ESTA categoría en ESTA ciudad)
+  // 1) Obtener todas las subcategorías que pertenecen a la categoría
+  const { data: subcatsForCategory } = await supabase
+    .from("subcategories")
+    .select("id")
+    .eq("category_id", categoryId)
+
+  const subcatIds = (subcatsForCategory || []).map((s) => s.id)
+
+  // 2) Contar restaurantes aprobados en la ciudad que tengan al menos una de esas subcategorías
+  let totalRestaurants = 0
+  if (subcatIds.length > 0) {
+    const { count: catCount } = await supabase
+      .from("restaurants")
+      .select("id, restaurant_subcategories!inner(subcategory_id)", { count: "exact", head: true })
+      .eq("city_id", cityId)
+      .eq("is_approved", true)
+      .in("restaurant_subcategories.subcategory_id", subcatIds as string[])
+    totalRestaurants = catCount ?? 0
+  } else {
+    totalRestaurants = 0
   }
 
-  if (loading) {
-    return (
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
-        <div className="text-center">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto mb-4"></div>
-          <p className="text-gray-600">Cargando restaurantes...</p>
-        </div>
-      </div>
-    )
+  const totalRestaurantsLabel = new Intl.NumberFormat("es-MX").format(totalRestaurants)
+
+  // ---- Parámetros de filtros y orden
+  const selected = {
+    subcategory: toArray(sp.subcategory),
+    amenity: toArray(sp.amenity),
+    dietary: toArray(sp.dietary),
+    price: toArray(sp.price),
   }
 
-  if (!city || !category) {
-    return (
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
-        <div className="text-center">
-          <h1 className="text-2xl font-bold text-gray-900 mb-2">Página no encontrada</h1>
-          <p className="text-gray-600">La ciudad o categoría que buscas no existe.</p>
-        </div>
-      </div>
-    )
-  }
+  const sortParamRaw = Array.isArray(sp.sort) ? sp.sort[0] : sp.sort
+  const sort: "destacados" | "rating" = sortParamRaw === "rating" ? "rating" : "destacados"
 
-  const breadcrumbItems = [
-    { label: "Inicio", href: "/" },
-    { label: city.state, href: `/${city.state.toLowerCase().replace(" ", "-")}` },
-    { label: city.name, href: `/${city.slug}` },
-    { label: category.name },
-  ]
+  // ---- FAQs (scope=category + city_id)
+  let faqs: { number: number; question: string; answer: string }[] = []
+  {
+    const { data: faqsData } = await supabase
+      .from("faqs")
+      .select("question, answer")
+      .eq("scope", "category")
+      .eq("scope_id", categoryId)
+      .eq("city_id", cityId)
+      .eq("status", "published")
+      .order("sort_order", { ascending: true, nullsFirst: false })
+      .limit(5)
+
+    faqs = (faqsData || []).map((faq, idx) => ({
+      number: idx + 1,
+      question: faq.question,
+      answer: faq.answer,
+    }))
+  }
 
   return (
-    <div className="min-h-screen bg-gray-50">
-      <div className="max-w-7xl mx-auto px-4 py-6">
-        {/* Breadcrumbs */}
-        <Breadcrumbs items={breadcrumbItems} className="mb-6" />
+    <>
+      <HeaderClient
+        breadcrumbItems={[
+          { label: "Inicio", href: "/" },
+          { label: cityTitle, href: `/${city}` },
+          { label: categoryTitle, href: `/${city}/${category}` },
+        ]}
+        title={`${categoryTitle} en ${cityTitle}`}
+        categoryDescription={categoryDescription || undefined}
+        categoryName={categoryTitle}
+        cityName={cityTitle}
+        totalRestaurantsLabel={totalRestaurantsLabel}
+        filters={filters}
+        citySlug={city}
+      />
 
-        {/* Header */}
-        <div className="bg-white rounded-lg shadow-sm p-6 mb-6">
-          <div className="flex items-center justify-between">
-            <div>
-              <h1 className="text-3xl font-bold text-gray-900 mb-2">
-                Restaurantes de {category.name} en {city.name}
-              </h1>
-              <div className="flex items-center text-gray-600">
-                <MapPin className="h-4 w-4 mr-1" />
-                <span>{filteredRestaurants.length} restaurantes encontrados</span>
-              </div>
-            </div>
-
-            <Button variant="outline" onClick={() => setShowFilters(!showFilters)} className="lg:hidden">
-              <Filter className="h-4 w-4 mr-2" />
-              Filtros
-            </Button>
-          </div>
+      <div className="flex flex-col lg:flex-row gap-6">
+        <div className="flex-1 order-1 lg:order-2">
+          <RestaurantList citySlug={city} categorySlug={category} filters={selected} sort={sort} />
         </div>
-
-        <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
-          {/* Filtros - Desktop siempre visible, Mobile condicional */}
-          <div className={`lg:block ${showFilters ? "block" : "hidden"} lg:col-span-1`}>
-            <RestaurantFilters onFiltersChange={setFilters} availableAmenities={availableAmenities} />
-          </div>
-
-          {/* Lista de restaurantes */}
-          <div className="lg:col-span-3">
-            {filteredRestaurants.length > 0 ? (
-              <div className="space-y-4">
-                {filteredRestaurants.map((restaurant) => (
-                  <RestaurantCard
-                    key={restaurant.id}
-                    restaurant={restaurant}
-                    onFavoriteToggle={handleFavoriteToggle}
-                    isFavorited={favoriteRestaurants.has(restaurant.id)}
-                  />
-                ))}
-              </div>
-            ) : (
-              <div className="bg-white rounded-lg shadow-sm p-12 text-center">
-                <div className="text-gray-500">
-                  <MapPin className="h-12 w-12 mx-auto mb-4 text-gray-400" />
-                  <h3 className="text-lg font-medium mb-2">No se encontraron restaurantes</h3>
-                  <p>Intenta ajustar los filtros para ver más opciones</p>
-                </div>
-              </div>
-            )}
-          </div>
+        <div className="hidden lg:block lg:w-64 lg:shrink-0 order-2 lg:order-1">
+          <RestaurantFiltersSidebar filters={filters} />
         </div>
       </div>
-    </div>
+
+      {faqs.length > 0 && (
+        <section className="mt-12">
+          <h2 className="text-2xl font-bold mb-6">
+            Preguntas frecuentes sobre los restaurantes de {categoryTitle} en {cityTitle}
+          </h2>
+          <FaqAccordion faqs={faqs} />
+        </section>
+      )}
+    </>
   )
 }

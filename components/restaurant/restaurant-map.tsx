@@ -1,40 +1,31 @@
 "use client"
 
-import { useEffect, useRef } from "react"
-import { ExternalLink, Navigation } from "lucide-react"
+import { useEffect, useState } from "react"
+import Map, { Marker, NavigationControl } from "react-map-gl"
+import "mapbox-gl/dist/mapbox-gl.css"
+import { Navigation, ExternalLink, MapPin } from "lucide-react"
 import { Button } from "@/components/ui/button"
-import type { Restaurant } from "@/types/restaurant"
+import { Card } from "@/components/ui/card"
 
 interface RestaurantMapProps {
-  restaurant: Restaurant
+  restaurant: {
+    name: string
+    address: string
+    googleMapsLink?: string
+    coordinates: {
+      lat: number
+      lng: number
+    }
+  }
   className?: string
 }
 
 export function RestaurantMap({ restaurant, className }: RestaurantMapProps) {
-  const mapContainer = useRef<HTMLDivElement>(null)
-  const map = useRef<any>(null)
+  const [isMounted, setIsMounted] = useState(false)
 
   useEffect(() => {
-    // Simulamos la inicialización del mapa de Mapbox
-    // En producción, aquí iría la configuración real de Mapbox GL JS
-    if (mapContainer.current && !map.current) {
-      // Placeholder para el mapa
-      const mapDiv = mapContainer.current
-      mapDiv.innerHTML = `
-        <div class="w-full h-full bg-gray-200 flex items-center justify-center rounded-lg">
-          <div class="text-center">
-            <div class="w-12 h-12 bg-red-500 rounded-full mx-auto mb-2 flex items-center justify-center">
-              <svg class="w-6 h-6 text-white" fill="currentColor" viewBox="0 0 20 20">
-                <path fillRule="evenodd" d="M5.05 4.05a7 7 0 119.9 9.9L10 18.9l-4.95-4.95a7 7 0 010-9.9zM10 11a2 2 0 100-4 2 2 0 000 4z" clipRule="evenodd" />
-              </svg>
-            </div>
-            <p class="text-sm text-gray-600">${restaurant.name}</p>
-            <p class="text-xs text-gray-500">${restaurant.address}</p>
-          </div>
-        </div>
-      `
-    }
-  }, [restaurant])
+    setIsMounted(true)
+  }, [])
 
   const handleOpenInGoogleMaps = () => {
     if (restaurant.googleMapsLink) {
@@ -51,28 +42,79 @@ export function RestaurantMap({ restaurant, className }: RestaurantMapProps) {
   }
 
   return (
-    <div className={className}>
-      <div className="bg-white rounded-lg shadow-sm border overflow-hidden">
-        <div className="p-4 border-b">
-          <h3 className="font-semibold mb-2">Ubicación</h3>
-          <p className="text-sm text-gray-600">{restaurant.address}</p>
-        </div>
-
-        <div ref={mapContainer} className="h-80" />
-
-        <div className="p-4 border-t bg-gray-50">
-          <div className="flex gap-2">
-            <Button variant="outline" size="sm" onClick={handleGetDirections} className="flex-1 bg-transparent">
-              <Navigation className="h-4 w-4 mr-2" />
-              Cómo llegar
-            </Button>
-            <Button variant="outline" size="sm" onClick={handleOpenInGoogleMaps} className="flex-1 bg-transparent">
-              <ExternalLink className="h-4 w-4 mr-2" />
-              Abrir en Google
-            </Button>
-          </div>
-        </div>
-      </div>
+   <section className={className} id="location" aria-label="Mapa y dirección del restaurante">
+  <Card className="p-5">
+    <div className="mb-4">
+      <h2 className="text-[19px] font-semibold text-black flex items-center gap-2">
+        <MapPin className="w-5 h-5 text-black" />
+        Ubicación
+      </h2>
+      <address className="not-italic text-sm text-gray-700 mt-1">
+        {restaurant.address}
+      </address>
     </div>
+
+    <div className="h-80 rounded overflow-hidden" aria-hidden="true">
+      {isMounted && restaurant.coordinates.lat && restaurant.coordinates.lng && (
+        <Map
+          mapboxAccessToken={process.env.NEXT_PUBLIC_MAPBOX_TOKEN}
+          initialViewState={{
+            latitude: restaurant.coordinates.lat,
+            longitude: restaurant.coordinates.lng,
+            zoom: 14,
+          }}
+          mapStyle="mapbox://styles/mapbox/streets-v11"
+          style={{ width: "100%", height: "100%" }}
+        >
+          <Marker
+            latitude={restaurant.coordinates.lat}
+            longitude={restaurant.coordinates.lng}
+            anchor="bottom"
+          >
+            <div className="w-9 h-9 bg-black rounded-full flex items-center justify-center">
+              <MapPin className="text-white w-5 h-5" />
+            </div>
+          </Marker>
+
+          <NavigationControl position="bottom-right" showZoom={true} />
+        </Map>
+      )}
+    </div>
+
+    <div className="mt-4">
+  <div className="flex gap-2">
+    {/* Enlace para cómo llegar */}
+    <a
+      href={`https://www.google.com/maps/dir/?api=1&destination=${restaurant.coordinates.lat},${restaurant.coordinates.lng}`}
+      target="_blank"
+      rel="noopener noreferrer"
+      className="flex-1 bg-transparent inline-flex items-center justify-center px-4 py-2 border rounded-md text-sm font-medium hover:bg-gray-100"
+    >
+      <Navigation className="h-4 w-4 mr-2" />
+      Cómo llegar
+    </a>
+
+    {/* Enlace para abrir en Google Maps */}
+    <a
+      href={
+        restaurant.googleMapsLink
+          ? restaurant.googleMapsLink
+          : `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(
+              `${restaurant.name} ${restaurant.address}`
+            )}`
+      }
+      target="_blank"
+      rel="noopener noreferrer"
+      className="flex-1 bg-transparent inline-flex items-center justify-center px-4 py-2 border rounded-md text-sm font-medium hover:bg-gray-100"
+    >
+      <ExternalLink className="h-4 w-4 mr-2" />
+      Abrir en Google
+    </a>
+  </div>
+</div>
+
+  </Card>
+</section>
+
   )
 }

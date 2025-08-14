@@ -6,16 +6,16 @@ import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { Checkbox } from "@/components/ui/checkbox"
 
-interface RestaurantFiltersProps {
-  onFiltersChange: (filters: FilterState) => void
-  availableAmenities: string[]
-}
-
 export interface FilterState {
   rating: number[]
   priceRange: string[]
   amenities: string[]
   openNow: boolean
+}
+
+interface RestaurantFiltersProps {
+  onFiltersChange: (filters: FilterState) => void
+  availableAmenities: string[]
 }
 
 export function RestaurantFilters({ onFiltersChange, availableAmenities }: RestaurantFiltersProps) {
@@ -33,16 +33,19 @@ export function RestaurantFilters({ onFiltersChange, availableAmenities }: Resta
   }
 
   const priceRanges = [
-    { value: "budget", label: "Económico ($)", icon: "💰" },
-    { value: "mid", label: "Gama Media ($$)", icon: "💰💰" },
-    { value: "premium", label: "Premium ($$$)", icon: "💰💰💰" },
-    { value: "luxury", label: "Lujo ($$$$)", icon: "💰💰💰💰" },
+    { value: "budget", label: "Económico ($)" },
+    { value: "mid", label: "Gama Media ($$)" },
+    { value: "premium", label: "Premium ($$$)" },
+    { value: "luxury", label: "Lujo ($$$$)" },
   ]
 
   const ratings = [5, 4, 3, 2, 1]
 
   const activeFiltersCount =
-    filters.rating.length + filters.priceRange.length + filters.amenities.length + (filters.openNow ? 1 : 0)
+    filters.rating.length +
+    filters.priceRange.length +
+    filters.amenities.length +
+    (filters.openNow ? 1 : 0)
 
   return (
     <div className="bg-white p-4 rounded-lg shadow-sm border">
@@ -51,23 +54,28 @@ export function RestaurantFilters({ onFiltersChange, availableAmenities }: Resta
           <Filter className="h-4 w-4 mr-2" />
           Filtros
         </h3>
-        {activeFiltersCount > 0 && <Badge variant="secondary">{activeFiltersCount}</Badge>}
+        {activeFiltersCount > 0 && (
+          <Badge variant="secondary">{activeFiltersCount}</Badge>
+        )}
       </div>
 
       <div className="space-y-4">
+
         {/* Abierto ahora */}
         <div className="flex items-center space-x-2">
           <Checkbox
             id="openNow"
             checked={filters.openNow}
-            onCheckedChange={(checked) => updateFilters({ openNow: checked as boolean })}
+            onCheckedChange={(checked) =>
+              updateFilters({ openNow: Boolean(checked) })
+            }
           />
           <label htmlFor="openNow" className="text-sm font-medium">
             Abierto ahora
           </label>
         </div>
 
-        {/* Rating */}
+        {/* Calificación */}
         <div>
           <h4 className="font-medium mb-2">Calificación</h4>
           <div className="space-y-2">
@@ -77,7 +85,9 @@ export function RestaurantFilters({ onFiltersChange, availableAmenities }: Resta
                   id={`rating-${rating}`}
                   checked={filters.rating.includes(rating)}
                   onCheckedChange={(checked) => {
-                    const newRating = checked ? [...filters.rating, rating] : filters.rating.filter((r) => r !== rating)
+                    const newRating = checked
+                      ? [...filters.rating, rating]
+                      : filters.rating.filter((r) => r !== rating)
                     updateFilters({ rating: newRating })
                   }}
                 />
@@ -151,7 +161,7 @@ export function RestaurantFilters({ onFiltersChange, availableAmenities }: Resta
             variant="outline"
             size="sm"
             onClick={() => {
-              const clearedFilters = {
+              const clearedFilters: FilterState = {
                 rating: [],
                 priceRange: [],
                 amenities: [],

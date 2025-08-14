@@ -9,6 +9,7 @@ import { Badge } from "@/components/ui/badge"
 import { Textarea } from "@/components/ui/textarea"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { formatRating } from "@/lib/utils"
+import { Card } from "@/components/ui/card"
 
 interface ReviewsSectionProps {
   reviews: Review[]
@@ -47,10 +48,10 @@ export function ReviewsSection({
   }))
 
   return (
-    <div className="bg-white rounded-lg shadow-sm border p-6">
+    <Card id="reviews" className="p-5">
       <div className="flex justify-between items-start mb-6">
         <div>
-          <h2 className="text-2xl font-bold mb-2">Opiniones</h2>
+          <h2 className="text-[19px] font-semibold mb-2">Opiniones</h2>
           <div className="flex items-center gap-4">
             <div className="flex items-center">
               <Star className="h-6 w-6 fill-yellow-400 text-yellow-400" />
@@ -216,6 +217,6 @@ export function ReviewsSection({
           {canWriteReview && <p className="mt-2">¡Sé el primero en dejar una opinión!</p>}
         </div>
       )}
-    </div>
+    </Card>
   )
 }

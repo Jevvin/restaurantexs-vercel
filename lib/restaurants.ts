@@ -1,4 +1,8 @@
-import { supabase, type DatabaseReview, type DatabasePromotion, type DatabaseMenuItem } from "./supabase"
+// lib/restaurants.ts
+
+import supabase from "@/lib/supabaseClient"
+import type { DatabaseReview, DatabasePromotion, DatabaseMenuItem } from "@/types/database"
+
 import type { Restaurant, Review, Promotion, MenuItem } from "@/types/restaurant"
 
 // Convertir datos de la base de datos al tipo de la aplicación
@@ -12,30 +16,37 @@ function convertDatabaseRestaurant(dbRestaurant: any): Restaurant {
   }
 
   return {
-    id: dbRestaurant.id,
-    name: dbRestaurant.name,
-    slug: dbRestaurant.slug,
-    tagline: dbRestaurant.tagline || "",
-    description: dbRestaurant.description || "",
-    category: dbRestaurant.category_slug || "",
-    city: dbRestaurant.city_slug || "",
-    state: dbRestaurant.city_state || "",
-    address: dbRestaurant.address,
-    coordinates,
-    googleMapsLink: dbRestaurant.google_maps_link,
-    rating: dbRestaurant.rating,
-    reviewCount: dbRestaurant.review_count,
-    priceRange: dbRestaurant.price_range,
-    images: dbRestaurant.images || [],
-    amenities: dbRestaurant.amenities || [],
-    promotions: [], // Se carga por separado
-    menu: [], // Se carga por separado
-    hours: dbRestaurant.business_hours || {},
-    isOpen: dbRestaurant.is_open,
-    isClaimed: dbRestaurant.is_claimed,
-    ownerId: dbRestaurant.owner_id,
+  id: dbRestaurant.id,
+  name: dbRestaurant.name,
+  slug: dbRestaurant.slug,
+  tagline: dbRestaurant.tagline || "",
+  description: dbRestaurant.description || "",
+  category: dbRestaurant.category_slug || "",
+  city: dbRestaurant.city_slug || "",
+  state: dbRestaurant.city_state || "",
+  address: dbRestaurant.address,
+  coordinates,
+  googleMapsLink: dbRestaurant.google_maps_link,
+  rating: dbRestaurant.rating,
+  reviewCount: dbRestaurant.review_count,
+  priceRange: dbRestaurant.price_range,
+  images: dbRestaurant.images || [],
+  amenities: dbRestaurant.amenities || [],
+  promotions: [],
+  menu: [],
+  hours: dbRestaurant.business_hours || {},
+  isOpen: dbRestaurant.is_open,
+  isClaimed: dbRestaurant.is_claimed,
+  ownerId: dbRestaurant.owner_id,
+  categorizedImages: {
+  interior: { url: "", count: 0 },
+  food: { url: "", count: 0 },
+  menu: { url: "", count: 0 },
+  all: [],
+},
+
   }
-}
+  }
 
 function convertDatabaseReview(dbReview: DatabaseReview): Review {
   return {
@@ -48,9 +59,12 @@ function convertDatabaseReview(dbReview: DatabaseReview): Review {
     comment: dbReview.comment,
     images: dbReview.images,
     createdAt: dbReview.created_at,
-    ownerResponse: dbReview.owner_response,
+    ownerResponse: dbReview.owner_response
+      ? JSON.parse(dbReview.owner_response)
+      : undefined,
   }
 }
+
 
 function convertDatabasePromotion(dbPromotion: DatabasePromotion): Promotion {
   return {
@@ -396,4 +410,70 @@ export async function getAvailableAmenities() {
     console.error("Unexpected error in getAvailableAmenities:", error)
     return []
   }
+}
+
+// ✅ Nuevo método para obtener restaurantes con sus filtros ya listos
+export async function getRestaurantsWithFilters(citySlug: string) {
+  // 1. Obtener la ciudad
+  const { data: cities, error: cityError } = await supabase
+    .from("cities")
+    .select("id, name, slug, state")
+    .eq("slug", citySlug)
+
+  if (cityError || !cities?.length) return []
+
+  const city = cities[0]
+
+
+// 2) Obtener los restaurantes de esa ciudad con relaciones
+const { data: rawRestaurants, error: restaurantError } = await supabase
+  .from("restaurants")
+  .select(`
+    id,
+    name,
+    slug,
+    address,
+    price_level_id,
+    rating_average,
+    reviews_count,
+    is_approved,
+    restaurant_subcategories (
+      subcategory:subcategory_id (
+        id, name, slug
+      )
+    ),
+    restaurant_amenities (
+      amenity:amenity_id (
+        id, name
+      )
+    ),
+    restaurant_dietary_options (
+      dietary_option:dietary_option_id (
+        id, name
+      )
+    )
+  `)
+  .eq("city_id", city.id)
+  .eq("is_approved", true)
+  
+
+  if (restaurantError || !rawRestaurants?.length) return []
+
+  // 3. Mapear cada restaurante
+  return rawRestaurants.map((r) => ({
+    id: r.id,
+    name: r.name,
+    slug: r.slug,
+    address: r.address,
+    price_level_id: r.price_level_id,
+    rating: typeof r.rating_average === "number" ? r.rating_average : 0,
+review_count: typeof r.reviews_count === "number" ? r.reviews_count : 0,
+    // Relaciones mapeadas
+    subcategories: r.restaurant_subcategories?.map((rs: any) => rs.subcategory) || [],
+    amenities: r.restaurant_amenities?.map((ra: any) => ra.amenity) || [],
+    dietary_options: r.restaurant_dietary_options?.map((rd: any) => rd.dietary_option) || [],
+    // Extras opcionales
+    city_slug: city.slug,
+    city_state: city.state,
+  }))
 }

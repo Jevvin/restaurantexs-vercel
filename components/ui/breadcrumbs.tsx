@@ -1,3 +1,5 @@
+// components/ui/breadcrumbs.tsx
+
 import Link from "next/link"
 import { ChevronRight } from "lucide-react"
 import { cn } from "@/lib/utils"
@@ -14,16 +16,33 @@ interface BreadcrumbsProps {
 
 export function Breadcrumbs({ items, className }: BreadcrumbsProps) {
   return (
-    <nav aria-label="Breadcrumb" className={cn("flex items-center space-x-1 text-sm text-gray-600", className)}>
+    <nav
+      aria-label="Breadcrumb"
+      className={cn(
+        "flex items-center space-x-1 text-[11px] md:text-[11px] lg:text-[12px] text-black",
+        className
+      )}
+    >
       {items.map((item, index) => (
         <div key={index} className="flex items-center">
-          {index > 0 && <ChevronRight className="h-4 w-4 mx-2 text-gray-400" />}
+          {index > 0 && <ChevronRight className="h-4 w-4 mx-0 text-gray-400" />}
           {item.href && index < items.length - 1 ? (
-            <Link href={item.href} className="hover:text-gray-900 transition-colors">
-              {item.label}
+            <Link
+              href={item.href}
+              className="hover:text-black transition-colors text-[11px] md:text-[11px] lg:text-[12px]"
+            >
+              {item.label.toLocaleLowerCase()}
             </Link>
           ) : (
-            <span className={index === items.length - 1 ? "text-gray-900 font-medium" : ""}>{item.label}</span>
+            <span
+              className={
+                index === items.length - 1
+                  ? "text-black text-[11px] md:text-[11px] lg:text-[12px]"
+                  : ""
+              }
+            >
+              {item.label.toLocaleLowerCase()}
+            </span>
           )}
         </div>
       ))}

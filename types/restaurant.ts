@@ -1,3 +1,5 @@
+// types/restaurant.ts
+
 export interface Restaurant {
   id: string
   name: string
@@ -105,3 +107,33 @@ export interface Category {
   parentId?: string
   subcategories?: Category[]
 }
+
+export interface RestaurantWithFilters {
+  id: string
+  name: string
+  slug: string
+  address?: string
+  price_level_id?: string
+  rating?: number
+  review_count?: number
+
+  subcategories: {
+    id: string
+    name: string
+    slug: string
+  }[]
+
+  amenities: {
+    id: string
+    name: string
+  }[]
+
+  dietary_options: {
+    id: string
+    name: string
+  }[]
+
+  city_slug?: string
+  city_state?: string
+}
+

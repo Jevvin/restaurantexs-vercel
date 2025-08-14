@@ -1,7 +1,7 @@
 "use client"
 
+import { useState } from "react"
 import type React from "react"
-
 import Image from "next/image"
 import Link from "next/link"
 import { Star, Heart, MapPin } from "lucide-react"
@@ -18,6 +18,7 @@ interface RestaurantCardProps {
   isFavorited?: boolean
 }
 
+
 export function RestaurantCard({
   restaurant,
   showDistance,
@@ -31,8 +32,9 @@ export function RestaurantCard({
     onFavoriteToggle?.(restaurant.id)
   }
 
+
   return (
-    <Link href={`/${restaurant.city}/${restaurant.slug}`}>
+    <Link href={`/restaurant/${restaurant.slug}`}>
       <div className="bg-white rounded-lg shadow-md hover:shadow-lg transition-shadow duration-200 overflow-hidden">
         <div className="flex">
           {/* Imagen */}
@@ -65,7 +67,9 @@ export function RestaurantCard({
                 <h3 className="text-lg font-semibold text-gray-900 mb-1">{restaurant.name}</h3>
                 <p className="text-sm text-gray-600 capitalize">{restaurant.category}</p>
               </div>
-              {showDistance && distance && <div className="text-sm text-gray-500">{distance.toFixed(1)} km</div>}
+              {showDistance && distance !== undefined && (
+                <div className="text-sm text-gray-500">{distance.toFixed(1)} km</div>
+              )}
             </div>
 
             <div className="flex items-center mb-2">

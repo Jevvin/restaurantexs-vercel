@@ -4,13 +4,24 @@
 
 html {
   scroll-behavior: smooth;
+  @apply font-sans; /* ✅ Aplica Poppins a todo el html */
 }
 
 @layer utilities {
   .text-balance {
     text-wrap: balance;
   }
+
+  /* Oculta la barra de scroll (WebKit, Firefox y Edge/IE) */
+  .no-scrollbar {
+    -ms-overflow-style: none;
+    scrollbar-width: none;
+  }
+  .no-scrollbar::-webkit-scrollbar {
+    display: none;
+  }
 }
+
 
 @layer base {
   :root {
@@ -48,6 +59,7 @@ html {
     --sidebar-border: 220 13% 91%;
     --sidebar-ring: 217.2 91.2% 59.8%;
   }
+
   .dark {
     --background: 0 0% 3.9%;
     --foreground: 0 0% 98%;
@@ -88,7 +100,8 @@ html {
   * {
     @apply border-border;
   }
+
   body {
-    @apply bg-background text-foreground;
+    @apply bg-background text-foreground font-sans; /* ✅ Aplica Poppins globalmente */
   }
 }
